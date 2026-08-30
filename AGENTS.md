@@ -1,5 +1,7 @@
 # AGENTS.md
 
+[English](./AGENTS.en.md)
+
 ## 项目概述
 
 `mcptransformer` 是一个 Go 程序，把多个 stdio 的 MCP 服务器桥接为 Streamable HTTP 服务。依赖 `github.com/mark3labs/mcp-go` 与 `gopkg.in/yaml.v3`。

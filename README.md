@@ -1,5 +1,7 @@
 # mcptransformer
 
+[English](./README.en.md)
+
 把多个 stdio 的 MCP 服务器桥接为 **Streamable HTTP** 服务：启动 stdio 子进程作为上游 MCP 客户端，枚举其 tools / resources / resource templates / prompts，再通过 `StreamableHTTPServer` 暴露到同一个 HTTP 端口的多个 path 上。
 
 ## 功能
