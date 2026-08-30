@@ -1,0 +1,20 @@
+listen: ":8080"
+
+servers:
+  - name: filesystem
+    endpoint: /mcp/filesystem
+    version: "1.0.0"
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    env:
+      LOG_LEVEL: debug
+
+  - name: github
+    endpoint: /mcp/github
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+
+  - name: listfiles
+    endpoint: /mcp/listfiles
+    command: ./listfiles
+    args: ["."]
