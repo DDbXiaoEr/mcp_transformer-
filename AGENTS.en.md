@@ -17,6 +17,11 @@ make clean
 
 After changing code, always run `go build ./...` (or `make`) to confirm compilation and run `go vet ./...`.
 
+## Exploration constraints
+
+- The project structure is captured in `PROJECT_STRUCTURE.md`. Before making changes, read that file and this document to locate the target file; do not re-explore the entire repository on every task (avoid repeated whole-repo glob/grep).
+- Only re-explore and update `PROJECT_STRUCTURE.md` when the directory layout, file responsibilities, or dependencies change.
+
 ## Directory conventions
 
 - `cmd/mcptransformer/main.go` — bridge service main program (config parsing, stdio client, forwarding registration, StreamableHTTP server, graceful shutdown).

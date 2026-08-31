@@ -17,6 +17,11 @@ make clean
 
 修改代码后必须运行 `go build ./...` 或 `make` 确认编译通过，并运行 `go vet ./...`。
 
+## 探索约束
+
+- 项目结构已固化在 `PROJECT_STRUCTURE.md`。开始改动前先读该文件与本文档定位目标文件，**不要每次都全量探索仓库**（避免反复 glob/grep 整个项目）。
+- 仅当目录结构、文件职责或依赖发生变化时，才需要重新探索并同步更新 `PROJECT_STRUCTURE.md`。
+
 ## 目录约定
 
 - `cmd/mcptransformer/main.go` — 桥接服务主程序（配置解析、stdio 客户端、转发注册、StreamableHTTP 服务、优雅退出）。
