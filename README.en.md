@@ -32,7 +32,8 @@ listen: ":8080"          # shared HTTP listen address
 servers:
   - name: filesystem            # advertised server name
     endpoint: /mcp/filesystem   # Streamable HTTP endpoint path
-    version: "1.0.0"            # optional, default 1.0.0
+    version: "1.0.0"            # optional, server implementation version, default 1.0.0
+    protocolVersion: "2025-06-18" # optional, MCP protocol version this endpoint serves (default: negotiate with client)
     command: npx                # stdio server command
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
     env:                        # optional, subprocess environment variables
@@ -40,6 +41,7 @@ servers:
 
   - name: listfiles
     endpoint: /mcp/listfiles
+    protocolVersion: "2025-06-18"
     command: ./listfiles
     args: ["."]
 ```

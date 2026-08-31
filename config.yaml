@@ -16,5 +16,6 @@ servers:
 
   - name: listfiles
     endpoint: /mcp/listfiles
+    protocolVersion: "2025-06-18"
     command: ./listfiles
     args: ["."]

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mcptransformer 配置生成器</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e2e5ea;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #eff4ff;
+    --danger: #dc2626;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px 24px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    background: #fff;
+    color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 52px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .invalid { border-color: var(--danger) !important; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; min-width: 0; }
+  .server-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .server-head .title { font-weight: 600; }
+  .toolbar { display: flex; gap: 6px; }
+  button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--text);
+  }
+  button:hover { background: var(--accent-soft); border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(0.95); }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  button.icon { padding: 3px 7px; line-height: 1; }
+  button.danger { color: var(--danger); border-color: #fca5a5; }
+  button.danger:hover { background: #fef2f2; border-color: var(--danger); }
+  .output textarea {
+    min-height: 480px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border: none;
+  }
+  .output-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  #addServer { width: 100%; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>mcptransformer 配置生成器</h1>
+  <p>生成用于把 stdio MCP 服务器桥接为 Streamable HTTP 服务的 config.yaml（纯本地运行，无任何上传）</p>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h2>全局设置</h2>
+      <label for="listen">监听地址 listen</label>
+      <input type="text" id="listen" value=":8080" oninput="update()">
+    </div>
+
+    <div id="servers"></div>
+
+    <button id="addServer" class="primary" onclick="addServer()">+ 添加服务器</button>
+  </div>
+
+  <div class="card output">
+    <h2>生成的 config.yaml</h2>
+    <textarea id="out" readonly spellcheck="false"></textarea>
+    <div class="output-actions">
+      <button class="primary" onclick="copyOut()">复制</button>
+      <button onclick="downloadOut()">下载 config.yaml</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const VALID_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+
+let servers = [
+  {
+    name: "listfiles",
+    endpoint: "/mcp/listfiles",
+    version: "",
+    protocolVersion: "2025-06-18",
+    command: "./listfiles",
+    args: ["."],
+    env: {},
+  },
+];
+
+// ---- YAML string helpers ----
+function quoteYaml(s) {
+  return '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n") + '"';
+}
+function yamlStr(v) {
+  if (v === null || v === undefined) return '""';
+  const s = String(v);
+  if (s === "") return '""';
+  if (/^\s|\s$/.test(s) || s.includes("\n")) return quoteYaml(s);
+  if (/^(true|false|null|yes|no|on|off|~)$/i.test(s)) return quoteYaml(s);
+  if (/^[-?:,{}[\]#&*!|>'"%@`]/.test(s)) return quoteYaml(s);
+  if (/[:#{}[\],&*!|>'"%@`]/.test(s)) return quoteYaml(s);
+  return s;
+}
+
+function parseArgs(text) {
+  const lines = text.split("\n").map(l => l.trim()).filter(l => l !== "");
+  if (lines.length === 0) return [];
+  const out = [];
+  for (const l of lines) {
+    for (const part of l.split(",")) {
+      const p = part.trim();
+      if (p !== "") out.push(p);
+    }
+  }
+  return out;
+}
+
+function parseEnv(text) {
+  const env = {};
+  for (const line of text.split("\n")) {
+    const l = line.trim();
+    if (l === "" || l.startsWith("#")) continue;
+    const i = l.indexOf("=");
+    if (i <= 0) continue;
+    env[l.slice(0, i).trim()] = l.slice(i + 1).trim();
+  }
+  return env;
+}
+
+// ---- rendering ----
+function serverCard(i, s) {
+  const argsText = (s.args || []).join("\n");
+  const envLines = Object.entries(s.env || {}).map(([k, v]) => k + "=" + v);
+  const protoOpts = [["", "默认（跟随客户端协商）"]]
+    .concat(VALID_PROTOCOL_VERSIONS.map(v => [v, v]))
+    .map(([val, label]) => {
+      const sel = val === (s.protocolVersion || "") ? " selected" : "";
+      return '<option value="' + val + '"' + sel + ">" + label + "</option>";
+    })
+    .join("");
+
+  return '<div class="card" data-idx="' + i + '">' +
+    '<div class="server-head">' +
+      '<span class="title">服务器 ' + (i + 1) + '</span>' +
+      '<div class="toolbar">' +
+        '<button class="icon small" title="上移" onclick="moveServer(' + i + ',-1)">&#9650; 上移</button>' +
+        '<button class="icon small" title="下移" onclick="moveServer(' + i + ',1)">&#9660; 下移</button>' +
+        '<button class="icon small" title="复制" onclick="dupServer(' + i + ')">&#10697; 复制</button>' +
+        '<button class="small danger" title="删除该服务器" onclick="removeServer(' + i + ')">&#10005; 删除</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div>' +
+        '<label>name *</label>' +
+        '<input type="text" data-f="name" value="' + esc(s.name) + '" oninput="onField(' + i + ')" placeholder="如 listfiles">' +
+      '</div>' +
+      '<div>' +
+        '<label>endpoint *</label>' +
+        '<input type="text" data-f="endpoint" value="' + esc(s.endpoint) + '" oninput="onField(' + i + ')" placeholder="如 /mcp/listfiles">' +
+      '</div>' +
+    '</div>' +
+    '<div class="row">' +
+      '<div>' +
+        '<label>version（server 实现版本，默认 1.0.0）</label>' +
+        '<input type="text" data-f="version" value="' + esc(s.version) + '" oninput="onField(' + i + ')" placeholder="1.0.0">' +
+      '</div>' +
+      '<div>' +
+        '<label>protocolVersion（对外固定协议版本）</label>' +
+        '<select data-f="protocolVersion" onchange="onField(' + i + ')">' + protoOpts + "</select>" +
+      '</div>' +
+    '</div>' +
+    '<label>command *</label>' +
+    '<input type="text" data-f="command" value="' + esc(s.command) + '" oninput="onField(' + i + ')" placeholder="如 npx">' +
+    '<label>args（每行一个参数）</label>' +
+    '<textarea data-f="args" oninput="onField(' + i + ')" placeholder="-y&#10;@modelcontextprotocol/server-filesystem">' + esc(argsText) + "</textarea>" +
+    '<label>env（每行一个 KEY=VALUE）</label>' +
+    '<textarea data-f="env" oninput="onField(' + i + ')" placeholder="LOG_LEVEL=debug">' + esc(envLines.join("\n")) + "</textarea>" +
+  "</div>";
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderServers() {
+  const el = document.getElementById("servers");
+  if (servers.length === 0) {
+    el.innerHTML = '<div class="card empty">还没有服务器，点击下方“添加服务器”。</div>';
+  } else {
+    el.innerHTML = servers.map((s, i) => serverCard(i, s)).join("");
+  }
+  update();
+}
+
+function onField(i) {
+  const card = document.querySelector('#servers [data-idx="' + i + '"]');
+  const s = servers[i];
+  s.name = card.querySelector('[data-f="name"]').value.trim();
+  s.endpoint = card.querySelector('[data-f="endpoint"]').value.trim();
+  s.version = card.querySelector('[data-f="version"]').value.trim();
+  s.protocolVersion = card.querySelector('[data-f="protocolVersion"]').value;
+  s.command = card.querySelector('[data-f="command"]').value.trim();
+  s.args = parseArgs(card.querySelector('[data-f="args"]').value);
+  s.env = parseEnv(card.querySelector('[data-f="env"]').value);
+  update();
+}
+
+function addServer() {
+  servers.push({ name: "", endpoint: "", version: "", protocolVersion: "", command: "", args: [], env: {} });
+  renderServers();
+}
+function removeServer(i) {
+  servers.splice(i, 1);
+  renderServers();
+}
+function dupServer(i) {
+  const c = JSON.parse(JSON.stringify(servers[i]));
+  c.endpoint = "";
+  servers.splice(i + 1, 0, c);
+  renderServers();
+}
+function moveServer(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= servers.length) return;
+  [servers[i], servers[j]] = [servers[j], servers[i]];
+  renderServers();
+}
+
+// ---- YAML generation ----
+function generate() {
+  const listen = document.getElementById("listen").value.trim() || ":8080";
+  const lines = [];
+  lines.push("listen: " + yamlStr(listen));
+  lines.push("");
+  lines.push("servers:");
+  if (servers.length === 0) {
+    lines.push("  # （暂无服务器）");
+  }
+  servers.forEach(s => {
+    lines.push("  - name: " + yamlStr(s.name || ""));
+    lines.push("    endpoint: " + yamlStr(s.endpoint || ""));
+    if (s.version) lines.push("    version: " + yamlStr(s.version));
+    if (s.protocolVersion) lines.push("    protocolVersion: " + yamlStr(s.protocolVersion));
+    lines.push("    command: " + yamlStr(s.command || ""));
+    if (s.args && s.args.length) {
+      lines.push("    args: [" + s.args.map(a => quoteYaml(a)).join(", ") + "]");
+    }
+    const envKeys = Object.keys(s.env || {});
+    if (envKeys.length) {
+      lines.push("    env:");
+      for (const k of envKeys) lines.push("      " + yamlStr(k) + ": " + yamlStr(s.env[k]));
+    }
+  });
+  return lines.join("\n") + "\n";
+}
+
+function update() {
+  document.getElementById("out").value = generate();
+  validate();
+}
+
+function validate() {
+  servers.forEach((s, i) => {
+    const card = document.querySelector('#servers [data-idx="' + i + '"]');
+    if (!card) return;
+    const nameEl = card.querySelector('[data-f="name"]');
+    const epEl = card.querySelector('[data-f="endpoint"]');
+    const cmdEl = card.querySelector('[data-f="command"]');
+    nameEl.classList.toggle("invalid", !nameEl.value.trim());
+    epEl.classList.toggle("invalid", !epEl.value.trim() || !epEl.value.trim().startsWith("/"));
+    cmdEl.classList.toggle("invalid", !cmdEl.value.trim());
+  });
+}
+
+// ---- output actions ----
+function copyOut() {
+  const el = document.getElementById("out");
+  el.select();
+  el.setSelectionRange(0, el.value.length);
+  navigator.clipboard.writeText(el.value).then(() => flash("已复制到剪贴板"));
+}
+function downloadOut() {
+  const blob = new Blob([document.getElementById("out").value], { type: "application/yaml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "config.yaml";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function flash(msg) {
+  const b = document.getElementById("addServer");
+  const old = b.textContent;
+  b.textContent = msg;
+  setTimeout(() => (b.textContent = old), 1500);
+}
+
+renderServers();
+</script>
+</body>
+</html>

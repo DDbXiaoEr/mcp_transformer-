@@ -31,6 +31,7 @@ After changing code, always run `go build ./...` (or `make`) to confirm compilat
 - Capability enumeration: `ListTools` / `ListResources` / `ListResourceTemplates` / `ListPrompts`, registering the returned `mcp.Tool`/`Resource`/`ResourceTemplate`/`Prompt` directly onto `server.NewMCPServer` (same types, no schema rebuilding).
 - Forwarding handlers: tool→`CallTool`, resource/template→`ReadResource`, prompt→`GetPrompt`.
 - HTTP exposure: `server.NewStreamableHTTPServer(s, server.WithEndpointPath(endpoint))`, mounted on a shared `http.ServeMux`.
+- Protocol version: each endpoint can configure `protocolVersion` (`ServerConfig.ProtocolVersion`) to pin the MCP protocol version it serves; implemented by overriding `result.ProtocolVersion` via `server.WithHooks` `AddAfterInitialize`. When unset, mcp-go's default client-version negotiation is preserved.
 - When resource/template/prompt enumeration fails, only log a warning and skip (upstream may not support it), without failing the whole server; a failed tools enumeration skips that server.
 
 ## Test stdio server

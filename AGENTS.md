@@ -31,6 +31,7 @@ make clean
 - 能力枚举：`ListTools` / `ListResources` / `ListResourceTemplates` / `ListPrompts`，把返回的 `mcp.Tool`/`Resource`/`ResourceTemplate`/`Prompt` 直接注册到 `server.NewMCPServer`（类型同源，无需重建 schema）。
 - 转发 handler：tool→`CallTool`，resource/template→`ReadResource`，prompt→`GetPrompt`。
 - HTTP 暴露：`server.NewStreamableHTTPServer(s, server.WithEndpointPath(endpoint))`，挂到共享 `http.ServeMux`。
+- 协议版本：每个 endpoint 可配置 `protocolVersion`（`ServerConfig.ProtocolVersion`）来固定对外服务的 MCP 协议版本；实现方式是通过 `server.WithHooks` 的 `AddAfterInitialize` 钩子覆盖 `result.ProtocolVersion`。未配置时保持 mcp-go 默认的客户端版本协商。
 - 资源/模板/提示词枚举失败时仅记录告警并跳过（上游可能不支持），不会导致整条 server 失败；tools 枚举失败则跳过该 server。
 
 ## 测试 stdio 服务器

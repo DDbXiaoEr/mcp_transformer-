@@ -32,7 +32,8 @@ listen: ":8080"          # 共享 HTTP 监听地址
 servers:
   - name: filesystem            # 对外广告的 server 名
     endpoint: /mcp/filesystem   # Streamable HTTP 端点路径
-    version: "1.0.0"            # 可选，默认 1.0.0
+    version: "1.0.0"            # 可选，server 实现版本，默认 1.0.0
+    protocolVersion: "2025-06-18" # 可选，端点固定服务的 MCP 协议版本（默认跟随客户端协商）
     command: npx                # stdio 服务器命令
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
     env:                        # 可选，子进程环境变量
@@ -40,6 +41,7 @@ servers:
 
   - name: listfiles
     endpoint: /mcp/listfiles
+    protocolVersion: "2025-06-18"
     command: ./listfiles
     args: ["."]
 ```

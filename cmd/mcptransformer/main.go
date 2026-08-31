@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -25,12 +26,13 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Name     string            `yaml:"name"`
-	Endpoint string            `yaml:"endpoint"`
-	Version  string            `yaml:"version"`
-	Command  string            `yaml:"command"`
-	Args     []string          `yaml:"args"`
-	Env      map[string]string `yaml:"env"`
+	Name            string            `yaml:"name"`
+	Endpoint        string            `yaml:"endpoint"`
+	Version         string            `yaml:"version"`
+	ProtocolVersion string            `yaml:"protocolVersion"`
+	Command         string            `yaml:"command"`
+	Args            []string          `yaml:"args"`
+	Env             map[string]string `yaml:"env"`
 }
 
 func main() {
@@ -122,6 +124,9 @@ func validateServer(sc *ServerConfig) error {
 	if !strings.HasPrefix(sc.Endpoint, "/") {
 		return fmt.Errorf("endpoint must start with '/'")
 	}
+	if sc.ProtocolVersion != "" && !slices.Contains(mcp.ValidProtocolVersions, sc.ProtocolVersion) {
+		return fmt.Errorf("unsupported protocolVersion %q (valid: %s)", sc.ProtocolVersion, strings.Join(mcp.ValidProtocolVersions, ", "))
+	}
 	return nil
 }
 
@@ -161,11 +166,21 @@ func buildProxy(ctx context.Context, sc ServerConfig) (*client.Client, *server.S
 		version = "1.0.0"
 	}
 
-	s := server.NewMCPServer(sc.Name, version,
+	opts := []server.ServerOption{
 		server.WithToolCapabilities(true),
 		server.WithResourceCapabilities(true, false),
 		server.WithPromptCapabilities(true),
-	)
+	}
+
+	if sc.ProtocolVersion != "" {
+		hooks := &server.Hooks{}
+		hooks.AddAfterInitialize(func(ctx context.Context, id any, msg *mcp.InitializeRequest, result *mcp.InitializeResult) {
+			result.ProtocolVersion = sc.ProtocolVersion
+		})
+		opts = append(opts, server.WithHooks(hooks))
+	}
+
+	s := server.NewMCPServer(sc.Name, version, opts...)
 
 	if err := registerTools(ctx, upstream, s); err != nil {
 		return fail(err)
