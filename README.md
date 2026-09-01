@@ -11,6 +11,7 @@
 - 单端口多 path 挂载，session 管理、SSE、CORS 由 `mcp-go` 提供。
 - 优雅退出：`SIGINT`/`SIGTERM` 时关闭 HTTP 服务并结束所有子进程。
 - 上游 stderr 转发到本进程日志，便于排障。
+- 管理 API：独立的状态查询与运行期控制（reload / stop / start）接口。
 
 ## 构建
 
@@ -27,7 +28,12 @@ go build -o build/mcptransformer ./cmd/mcptransformer
 `config.yaml`：
 
 ```yaml
-listen: ":8080"          # 共享 HTTP 监听地址
+listen: ":8080"          # MCP 业务监听地址（默认 :8080）
+
+admin:                   # 可选，管理 API（独立端口，缺省即下方默认值）
+  listen: ":8081"               # 管理端口，默认 :8081；与 listen 相同时自动合并挂载
+  statusPath: /__admin/status    # GET 查询上游状态
+  controlPath: /__admin/control  # POST 控制 reload/stop/start
 
 servers:
   - name: filesystem            # 对外广告的 server 名
@@ -72,6 +78,62 @@ curl -s -X POST http://localhost:8080/mcp/listfiles \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_files","arguments":{}}}'
 ```
 
+## 管理 API
+
+> 管理接口默认独立监听 `:8081`（`admin.listen` 可配置），与 MCP 业务端口分离；
+> 若 `admin.listen` 与 `listen` 相同，则自动合并挂载到同一端口。
+> 路径可在 `admin` 配置段自定义（默认 `/__admin/status` 与 `/__admin/control`）。
+
+### 状态查询
+
+`GET /__admin/status` 返回每个上游服务器的运行状态：
+
+```bash
+curl -s http://localhost:8081/__admin/status
+```
+
+```json
+{
+  "servers": [
+    {"name": "listfiles", "endpoint": "/mcp/listfiles", "command": "./listfiles", "status": "running"}
+  ]
+}
+```
+
+`status` 取值：`running`（已连接）、`down`（进程退出、重连中）、`stopped`（已手动 stop）、`error`（启动失败）。
+
+### 控制
+
+`POST /__admin/control`，`action` 支持 `reload` / `stop` / `start`，`server` 指定目标（缺省作用于所有服务器）：
+
+```bash
+# 重连并重新枚举某个上游的能力
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"reload","server":"listfiles"}'
+
+# 停止某个上游（endpoint 返回 503）
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"stop","server":"listfiles"}'
+
+# 重新启动已停止的上游
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"start","server":"listfiles"}'
+
+# 不带 server 则作用于全部
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"reload"}'
+```
+
+响应示例：
+
+```json
+{"results":[{"name":"listfiles","action":"reload","ok":true}]}
+```
+
 ## 项目结构
 
 ```
@@ -99,4 +161,4 @@ build/
 
 ## 已知限制
 
-- 上游能力在启动时快照注册，运行期新增/删除工具需重启本服务。
+- 上游能力在 reload 时重新快照注册；`stop` 后需通过控制 API `start` 恢复。

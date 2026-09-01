@@ -36,19 +36,25 @@
 
 ### cmd/mcptransformer/main.go — 桥接服务主程序
 
-- `Config` / `ServerConfig` — YAML 配置结构体。
-- `main` — 解析配置 → 逐个 `buildProxy` → 挂到 `http.ServeMux` → `ListenAndServe` → 优雅退出。
-- `loadConfig` / `validateServer` / `envList` — 配置读取、字段校验、env map 展开为 `k=v` 列表。
+- `Config` / `AdminConfig` / `ServerConfig` — YAML 配置结构体。
+- `main` — 解析配置 → 校验 server 与 admin 路径 → 逐个 `managedServer.start` → 挂业务 `mcpMux`
+  与 `adminMux`（独立 `listen` / `admin.listen` 端口，同地址时合并）→ `ListenAndServe` → 优雅退出。
+- `loadConfig` / `validateServer` / `adminPaths` / `validateAdminPath` / `envList` — 配置读取、
+  字段校验、admin 路径默认值与格式校验、env map 展开为 `k=v` 列表。
 - `proxy` — 上游 stdio 客户端封装：持有可替换的 `*client.Client`，`monitor` goroutine 监听
-  stderr EOF 检测进程退出并自动重连（指数退避）。
-- `newProxy` / `connect` / `current` / `isClosed` / `close` / `monitor` / `sleepOrDone` —
-  创建、连接、取当前客户端、关闭标记、监控重连、退避等待。
+  stderr EOF 检测进程退出并自动重连（指数退避）。`status` 报告 running/down/stopped。
+- `newProxy` / `connect` / `current` / `isClosed` / `status` / `close` / `monitor` / `sleepOrDone` —
+  创建、连接、取当前客户端、关闭标记、状态、监控重连、退避等待。
 - `proxy.ListTools` / `ListResources` / `ListResourceTemplates` / `ListPrompts` /
   `CallTool` / `ReadResource` / `GetPrompt` — 转发到当前上游客户端。
-- `buildProxy` — 创建 proxy、构建 `MCPServer`、注册能力、生成 `StreamableHTTPServer`。
+- `runtime` / `buildRuntime` — 一套可整体替换的“上游 proxy + StreamableHTTPServer handler”单元。
+- `managedServer` — 生命周期封装：持有可替换的 `runtime`，实现 `http.Handler` 以便 mux 稳定挂载；
+  `start` / `reload` / `stop` 控制重建/替换/拆除，`status` 报告状态。
+- `manager` — 维护全部 managedServer（按 name 索引），暴露 `handleStatus`（GET）与
+  `handleControl`（POST：reload/stop/start）两个管理 HTTP API。
 - `registerTools` / `registerResources` / `registerPrompts` — 枚举并注册上游能力，
   handler 转发到 proxy。
-- `namedWriter` — 将上游 stderr 写入本进程日志。
+- `writeJSON` / `namedWriter` — JSON 响应助手 / 将上游 stderr 写入本进程日志。
 
 ### cmd/listfiles/main.go — 测试用 stdio MCP 服务器
 

@@ -6,7 +6,7 @@ GO        ?= go
 all: build
 
 build: mcptransformer listfiles
-	cp config.yaml $(BUILD_DIR)/config.yaml
+	@test -f $(BUILD_DIR)/config.yaml || cp config.yaml $(BUILD_DIR)/config.yaml
 
 mcptransformer:
 	$(GO) build -o $(BUILD_DIR)/mcptransformer ./cmd/mcptransformer

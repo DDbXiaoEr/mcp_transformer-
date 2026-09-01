@@ -1,4 +1,9 @@
-listen: ":8080"
+listen: ":8080"              # MCP 业务端口（默认 :8080）
+
+admin:
+  listen: ":8081"             # 可选，管理 API 端口（默认 :8081；与 listen 相同则合并挂载）
+  statusPath: /__admin/status    # 可选，状态查询 API，默认 /__admin/status
+  controlPath: /__admin/control  # 可选，控制 API，默认 /__admin/control
 
 servers:
   - name: filesystem
@@ -19,3 +24,8 @@ servers:
     protocolVersion: "2025-06-18"
     command: ./listfiles
     args: ["."]
+
+  - name: chrome-devtools
+    endpoint: /mcp/chrome-devtools
+    command: npx
+    args: ["-y", "chrome-devtools-mcp@latest"]

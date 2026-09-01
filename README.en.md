@@ -11,6 +11,7 @@ Bridges multiple stdio MCP servers into a **Streamable HTTP** service: launches 
 - Single port, multiple paths; session management, SSE, and CORS provided by `mcp-go`.
 - Graceful shutdown: on `SIGINT`/`SIGTERM` closes the HTTP server and terminates all subprocesses.
 - Upstream stderr is forwarded to the process log for easy debugging.
+- Admin API: separate status query and runtime control (reload / stop / start) endpoints.
 
 ## Build
 
@@ -27,7 +28,12 @@ Build artifacts and the config file are output to `build/`, which is a self-cont
 `config.yaml`:
 
 ```yaml
-listen: ":8080"          # shared HTTP listen address
+listen: ":8080"          # MCP business listen address (default :8080)
+
+admin:                   # optional, admin API (separate port, defaults shown below)
+  listen: ":8081"               # admin port, default :8081; merges onto the same mux when equal to listen
+  statusPath: /__admin/status    # GET upstream status
+  controlPath: /__admin/control  # POST reload/stop/start
 
 servers:
   - name: filesystem            # advertised server name
@@ -72,6 +78,63 @@ curl -s -X POST http://localhost:8080/mcp/listfiles \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_files","arguments":{}}}'
 ```
 
+## Admin API
+
+> The admin API listens on a separate port `:8081` by default (`admin.listen` is configurable),
+> isolated from the MCP business port; when `admin.listen` equals `listen`, both are mounted on
+> the same port. Paths can be customized via the `admin` config section (defaults `/__admin/status`
+> and `/__admin/control`).
+
+### Status
+
+`GET /__admin/status` returns the running status of every upstream server:
+
+```bash
+curl -s http://localhost:8081/__admin/status
+```
+
+```json
+{
+  "servers": [
+    {"name": "listfiles", "endpoint": "/mcp/listfiles", "command": "./listfiles", "status": "running"}
+  ]
+}
+```
+
+`status` values: `running` (connected), `down` (process exited, reconnecting), `stopped` (stopped via control), `error` (failed to start).
+
+### Control
+
+`POST /__admin/control`; `action` is one of `reload` / `stop` / `start`, and `server` targets a specific server (defaults to all):
+
+```bash
+# reconnect and re-enumerate one upstream's capabilities
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"reload","server":"listfiles"}'
+
+# stop one upstream (its endpoint then returns 503)
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"stop","server":"listfiles"}'
+
+# restart a stopped upstream
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"start","server":"listfiles"}'
+
+# omit server to act on all servers
+curl -s -X POST http://localhost:8081/__admin/control \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"reload"}'
+```
+
+Example response:
+
+```json
+{"results":[{"name":"listfiles","action":"reload","ok":true}]}
+```
+
 ## Project structure
 
 ```
@@ -99,4 +162,4 @@ build/
 
 ## Known limitations
 
-- Upstream capabilities are snapshotted at startup; adding/removing tools at runtime requires a restart.
+- Upstream capabilities are re-snapshotted on `reload`; after `stop`, use the control API `start` to recover.
