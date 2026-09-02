@@ -102,6 +102,21 @@
     color: #e2e8f0;
     border: none;
   }
+  #cmds {
+    margin: 0;
+    padding: 12px 14px;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: auto;
+  }
+  #cmds .c { color: #7dd3fc; }
+  #cmds .cm { color: #94a3b8; }
   .output-actions { display: flex; gap: 8px; margin-top: 10px; }
   .empty { text-align: center; color: var(--muted); padding: 24px 0; }
   #addServer { width: 100%; margin-top: 4px; }
@@ -117,8 +132,25 @@
   <div>
     <div class="card">
       <h2>全局设置</h2>
-      <label for="listen">监听地址 listen</label>
+      <label for="listen">MCP 业务端口 listen</label>
       <input type="text" id="listen" value=":8080" oninput="update()">
+    </div>
+
+    <div class="card">
+      <h2>Admin 管理设置（可选）</h2>
+      <label for="adminListen">管理端口 admin.listen</label>
+      <input type="text" id="adminListen" value=":8081" oninput="update()" placeholder=":8081">
+      <div class="hint">与 listen 相同则两个端口合并挂载。留空则仅保留 listen。</div>
+      <div class="row">
+        <div>
+          <label for="adminStatusPath">状态查询路径 statusPath</label>
+          <input type="text" id="adminStatusPath" value="/__admin/status" oninput="update()" placeholder="/__admin/status">
+        </div>
+        <div>
+          <label for="adminControlPath">控制路径 controlPath</label>
+          <input type="text" id="adminControlPath" value="/__admin/control" oninput="update()" placeholder="/__admin/control">
+        </div>
+      </div>
     </div>
 
     <div id="servers"></div>
@@ -133,6 +165,8 @@
       <button class="primary" onclick="copyOut()">复制</button>
       <button onclick="downloadOut()">下载 config.yaml</button>
     </div>
+    <h2 style="margin-top:16px;">服务控制和状态查询命令</h2>
+    <pre id="cmds" spellcheck="false"></pre>
   </div>
 </div>
 
@@ -140,6 +174,10 @@
 "use strict";
 
 const VALID_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+const defaultListen = ":8080";
+const defaultAdminListen = ":8081";
+const defaultStatusPath = "/__admin/status";
+const defaultControlPath = "/__admin/control";
 
 let servers = [
   {
@@ -300,6 +338,16 @@ function generate() {
   const lines = [];
   lines.push("listen: " + yamlStr(listen));
   lines.push("");
+  const adminListen = document.getElementById("adminListen").value.trim();
+  const adminStatusPath = document.getElementById("adminStatusPath").value.trim();
+  const adminControlPath = document.getElementById("adminControlPath").value.trim();
+  if (adminListen || adminStatusPath || adminControlPath) {
+    lines.push("admin:");
+    if (adminListen) lines.push("  listen: " + yamlStr(adminListen));
+    if (adminStatusPath) lines.push("  statusPath: " + yamlStr(adminStatusPath));
+    if (adminControlPath) lines.push("  controlPath: " + yamlStr(adminControlPath));
+    lines.push("");
+  }
   lines.push("servers:");
   if (servers.length === 0) {
     lines.push("  # （暂无服务器）");
@@ -324,7 +372,65 @@ function generate() {
 
 function update() {
   document.getElementById("out").value = generate();
+  renderCmds();
   validate();
+}
+
+// ---- curl command examples (based on current admin/listen config) ----
+function parseAddr(s) {
+  s = (s || "").trim();
+  if (s === "") return null;
+  let host = "", port = "";
+  if (s.startsWith("[")) {
+    const i = s.indexOf("]");
+    if (i < 0) return null;
+    host = s.slice(0, i + 1);
+    const rest = s.slice(i + 1);
+    port = rest.startsWith(":") ? rest.slice(1) : "";
+  } else {
+    const i = s.lastIndexOf(":");
+    if (i < 0) {
+      host = s;
+    } else {
+      host = s.slice(0, i);
+      port = s.slice(i + 1);
+    }
+  }
+  return { host, port };
+}
+function baseURL(addr) {
+  const p = parseAddr(addr);
+  if (!p) return null;
+  let host = p.host;
+  if (host === "" || host === "0.0.0.0" || host === "[::]") host = "127.0.0.1";
+  const port = p.port || "";
+  return "http://" + host + (port ? ":" + port : "");
+}
+function escJSON(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+function renderCmds() {
+  const listen = document.getElementById("listen").value.trim() || defaultListen;
+  const adminListen = document.getElementById("adminListen").value.trim() || defaultAdminListen;
+  const statusPath = document.getElementById("adminStatusPath").value.trim() || defaultStatusPath;
+  const controlPath = document.getElementById("adminControlPath").value.trim() || defaultControlPath;
+  const effAdmin = adminListen === listen ? listen : adminListen;
+  const base = baseURL(effAdmin);
+  const example = servers.find(s => s.name) || { name: "listfiles" };
+  const n = escJSON(example.name);
+  const cmd = [];
+  cmd.push("# 查看所有 server 状态（GET）");
+  cmd.push("curl -s " + base + statusPath);
+  cmd.push("");
+  cmd.push("# 控制操作（POST），action 可选 reload / stop / start");
+  cmd.push("# 作用于全部 server：不传 server 字段");
+  cmd.push("curl -s -X POST " + base + controlPath + " \\");
+  cmd.push("  -H 'Content-Type: application/json' -d '{\"action\":\"reload\"}'");
+  cmd.push("");
+  cmd.push("# 作用于单个 server（server 用配置里的 name，例如 \"" + example.name + "\"）");
+  cmd.push("curl -s -X POST " + base + controlPath + " \\");
+  cmd.push("  -H 'Content-Type: application/json' -d '{\"action\":\"reload\",\"server\":\"" + n + "\"}'");
+  document.getElementById("cmds").textContent = cmd.join("\n");
 }
 
 function validate() {
