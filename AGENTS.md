@@ -24,7 +24,13 @@ make clean
 
 ## 目录约定
 
-- `cmd/mcptransformer/main.go` — 桥接服务主程序（配置解析、stdio 客户端、转发注册、StreamableHTTP 服务、优雅退出）。
+- `cmd/mcptransformer/` — 桥接服务主程序，按职责拆分为多个同包文件（均为 `package main`）：
+  - `main.go` — 入口：加载/校验配置、挂载业务与管理 mux、优雅退出。
+  - `config.go` — 配置结构体、加载与校验、默认路径/端口常量。
+  - `proxy.go` — 上游 stdio 客户端封装（断线检测 + 指数退避重连）与转发方法。
+  - `runtime.go` — 单上游的完整可替换单元：proxy + StreamableHTTPServer handler，及能力枚举注册。
+  - `managed.go` — `managedServer` 生命周期封装（start/reload/stop/status）。
+  - `admin.go` — `manager` 与 status/control 管理 HTTP API、JSON 助手。
 - `cmd/listfiles/main.go` — 测试用 stdio MCP 服务器，暴露 `list_files` 工具列出目录文件。
 - `config.yaml` — 示例配置，每条 `servers` 项对应一个 HTTP `endpoint`。
 - 二进制与配置输出到 `build/`，已被 `.gitignore` 忽略。

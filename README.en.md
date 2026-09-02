@@ -96,7 +96,7 @@ curl -s http://localhost:8081/__admin/status
 ```json
 {
   "servers": [
-    {"name": "listfiles", "endpoint": "/mcp/listfiles", "command": "./listfiles", "status": "running"}
+    {"name": "listfiles", "status": "running"}
   ]
 }
 ```

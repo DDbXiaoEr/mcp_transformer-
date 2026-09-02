@@ -24,7 +24,13 @@ After changing code, always run `go build ./...` (or `make`) to confirm compilat
 
 ## Directory conventions
 
-- `cmd/mcptransformer/main.go` — bridge service main program (config parsing, stdio client, forwarding registration, StreamableHTTP server, graceful shutdown).
+- `cmd/mcptransformer/` — the bridge service main program, split by responsibility into multiple files of the same package (all `package main`):
+  - `main.go` — entry point: loads/validates config, mounts business and admin muxes, graceful shutdown.
+  - `config.go` — config structs, loading and validation, default path/port constants.
+  - `proxy.go` — upstream stdio client wrapper (death detection + exponential-backoff reconnect) and forwarding methods.
+  - `runtime.go` — a fully swappable unit for one upstream: proxy + StreamableHTTPServer handler, and capability enumeration registration.
+  - `managed.go` — `managedServer` lifecycle wrapper (start/reload/stop/status).
+  - `admin.go` — `manager` plus the status/control admin HTTP API and JSON helpers.
 - `cmd/listfiles/main.go` — test stdio MCP server exposing the `list_files` tool to list directory files.
 - `config.yaml` — example config; each `servers` entry maps to one HTTP `endpoint`.
 - Binaries and config are output to `build/`, which is ignored by `.gitignore`.
