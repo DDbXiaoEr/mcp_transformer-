@@ -29,9 +29,32 @@
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
   }
   header h1 { margin: 0; font-size: 18px; }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .lang-switch {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .lang-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+  }
+  .lang-btn.active {
+    background: var(--accent);
+    color: white;
+  }
   .wrap {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -124,30 +147,36 @@
 </head>
 <body>
 <header>
-  <h1>mcptransformer 配置生成器</h1>
-  <p>生成用于把 stdio MCP 服务器桥接为 Streamable HTTP 服务的 config.yaml（纯本地运行，无任何上传）</p>
+  <div>
+    <h1 data-i18n="title">mcptransformer 配置生成器</h1>
+    <p data-i18n="desc">生成用于把 stdio MCP 服务器桥接为 Streamable HTTP 服务的 config.yaml（纯本地运行，无任何上传）</p>
+  </div>
+  <div class="lang-switch">
+    <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+    <button class="lang-btn" onclick="switchLang('en')">EN</button>
+  </div>
 </header>
 
 <div class="wrap">
   <div>
     <div class="card">
-      <h2>全局设置</h2>
-      <label for="listen">MCP 业务端口 listen</label>
+      <h2 data-i18n="globalSettings">全局设置</h2>
+      <label for="listen" data-i18n="listenPort">MCP 业务端口 listen</label>
       <input type="text" id="listen" value=":8080" oninput="update()">
     </div>
 
     <div class="card">
-      <h2>Admin 管理设置（可选）</h2>
-      <label for="adminListen">管理端口 admin.listen</label>
+      <h2 data-i18n="adminSettings">Admin 管理设置（可选）</h2>
+      <label for="adminListen" data-i18n="adminPort">管理端口 admin.listen</label>
       <input type="text" id="adminListen" value=":8081" oninput="update()" placeholder=":8081">
-      <div class="hint">与 listen 相同则两个端口合并挂载。留空则仅保留 listen。</div>
+      <div class="hint" data-i18n="adminPortHint">与 listen 相同则两个端口合并挂载。留空则仅保留 listen。</div>
       <div class="row">
         <div>
-          <label for="adminStatusPath">状态查询路径 statusPath</label>
+          <label for="adminStatusPath" data-i18n="statusPath">状态查询路径 statusPath</label>
           <input type="text" id="adminStatusPath" value="/__admin/status" oninput="update()" placeholder="/__admin/status">
         </div>
         <div>
-          <label for="adminControlPath">控制路径 controlPath</label>
+          <label for="adminControlPath" data-i18n="controlPath">控制路径 controlPath</label>
           <input type="text" id="adminControlPath" value="/__admin/control" oninput="update()" placeholder="/__admin/control">
         </div>
       </div>
@@ -155,17 +184,17 @@
 
     <div id="servers"></div>
 
-    <button id="addServer" class="primary" onclick="addServer()">+ 添加服务器</button>
+    <button id="addServer" class="primary" onclick="addServer()" data-i18n="addServer">+ 添加服务器</button>
   </div>
 
   <div class="card output">
-    <h2>生成的 config.yaml</h2>
+    <h2 data-i18n="generatedConfig">生成的 config.yaml</h2>
     <textarea id="out" readonly spellcheck="false"></textarea>
     <div class="output-actions">
-      <button class="primary" onclick="copyOut()">复制</button>
-      <button onclick="downloadOut()">下载 config.yaml</button>
+      <button class="primary" onclick="copyOut()" data-i18n="copy">复制</button>
+      <button onclick="downloadOut()" data-i18n="download">下载 config.yaml</button>
     </div>
-    <h2 style="margin-top:16px;">服务控制和状态查询命令</h2>
+    <h2 style="margin-top:16px;" data-i18n="controlCommands">服务控制和状态查询命令</h2>
     <pre id="cmds" spellcheck="false"></pre>
   </div>
 </div>
@@ -173,7 +202,107 @@
 <script>
 "use strict";
 
-const VALID_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+// 国际化翻译对象
+const i18n = {
+  zh: {
+    title: "mcptransformer 配置生成器",
+    desc: "生成用于把 stdio MCP 服务器桥接为 Streamable HTTP 服务的 config.yaml（纯本地运行，无任何上传）",
+    globalSettings: "全局设置",
+    listenPort: "MCP 业务端口 listen",
+    adminSettings: "Admin 管理设置（可选）",
+    adminPort: "管理端口 admin.listen",
+    adminPortHint: "与 listen 相同则两个端口合并挂载。留空则仅保留 listen。",
+    statusPath: "状态查询路径 statusPath",
+    controlPath: "控制路径 controlPath",
+    addServer: "+ 添加服务器",
+    generatedConfig: "生成的 config.yaml",
+    copy: "复制",
+    download: "下载 config.yaml",
+    controlCommands: "服务控制和状态查询命令",
+    server: "服务器",
+    moveUp: "上移",
+    moveDown: "下移",
+    duplicate: "复制",
+    delete: "删除",
+    nameLabel: "name *",
+    endpointLabel: "endpoint *",
+    versionLabel: "version（server 实现版本，默认 1.0.0）",
+    protocolVersionLabel: "protocolVersion（对外固定协议版本）",
+    defaultProtocol: "默认（跟随客户端协商）",
+    commandLabel: "command *",
+    argsLabel: "args（每行一个参数）",
+    envLabel: "env（每行一个 KEY=VALUE）",
+    noServers: "还没有服务器，点击下方\"添加服务器\"。",
+    copied: "已复制到剪贴板",
+    noServersYaml: "（暂无服务器）",
+    // curl 命令示例
+    cmdStatus: "# 查看所有 server 状态（GET）",
+    cmdControl: "# 控制操作（POST），action 可选 reload / stop / start",
+    cmdAllServers: "# 作用于全部 server：不传 server 字段",
+    cmdSingleServer: "# 作用于单个 server（server 用配置里的 name，例如 \""
+  },
+  en: {
+    title: "mcptransformer Config Generator",
+    desc: "Generate config.yaml for bridging stdio MCP servers to Streamable HTTP services (runs locally, no uploads)",
+    globalSettings: "Global Settings",
+    listenPort: "MCP business port listen",
+    adminSettings: "Admin Settings (Optional)",
+    adminPort: "Admin port admin.listen",
+    adminPortHint: "Same as listen to merge ports. Leave empty to keep only listen.",
+    statusPath: "Status query path statusPath",
+    controlPath: "Control path controlPath",
+    addServer: "+ Add Server",
+    generatedConfig: "Generated config.yaml",
+    copy: "Copy",
+    download: "Download config.yaml",
+    controlCommands: "Service Control and Status Query Commands",
+    server: "Server",
+    moveUp: "Move Up",
+    moveDown: "Move Down",
+    duplicate: "Duplicate",
+    delete: "Delete",
+    nameLabel: "name *",
+    endpointLabel: "endpoint *",
+    versionLabel: "version (server implementation version, default 1.0.0)",
+    protocolVersionLabel: "protocolVersion (fixed protocol version)",
+    defaultProtocol: "Default (negotiate with client)",
+    commandLabel: "command *",
+    argsLabel: "args (one argument per line)",
+    envLabel: "env (one KEY=VALUE per line)",
+    noServers: "No servers yet. Click \"Add Server\" below.",
+    copied: "Copied to clipboard",
+    noServersYaml: "(no servers)",
+    // curl command examples
+    cmdStatus: "# Check all server status (GET)",
+    cmdControl: "# Control action (POST), action can be reload / stop / start",
+    cmdAllServers: "# Apply to all servers: omit server field",
+    cmdSingleServer: "# Apply to single server (use config name, e.g. \""
+  }
+};
+
+let currentLang = 'zh';
+
+function switchLang(lang) {
+  currentLang = lang;
+  // 更新按钮状态
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (lang === 'zh' ? '中文' : 'EN'));
+  });
+  // 更新所有带data-i18n属性的元素
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (i18n[lang][key]) {
+      el.textContent = i18n[lang][key];
+    }
+  });
+  // 更新页面标题
+  document.title = i18n[lang].title;
+  // 重新渲染服务器卡片和命令
+  renderServers();
+  renderCmds();
+}
+
+const VALID_PROTOCOL_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const defaultListen = ":8080";
 const defaultAdminListen = ":8081";
 const defaultStatusPath = "/__admin/status";
@@ -233,9 +362,10 @@ function parseEnv(text) {
 
 // ---- rendering ----
 function serverCard(i, s) {
+  const t = i18n[currentLang];
   const argsText = (s.args || []).join("\n");
   const envLines = Object.entries(s.env || {}).map(([k, v]) => k + "=" + v);
-  const protoOpts = [["", "默认（跟随客户端协商）"]]
+  const protoOpts = [["", t.defaultProtocol]]
     .concat(VALID_PROTOCOL_VERSIONS.map(v => [v, v]))
     .map(([val, label]) => {
       const sel = val === (s.protocolVersion || "") ? " selected" : "";
@@ -245,39 +375,39 @@ function serverCard(i, s) {
 
   return '<div class="card" data-idx="' + i + '">' +
     '<div class="server-head">' +
-      '<span class="title">服务器 ' + (i + 1) + '</span>' +
+      '<span class="title">' + t.server + ' ' + (i + 1) + '</span>' +
       '<div class="toolbar">' +
-        '<button class="icon small" title="上移" onclick="moveServer(' + i + ',-1)">&#9650; 上移</button>' +
-        '<button class="icon small" title="下移" onclick="moveServer(' + i + ',1)">&#9660; 下移</button>' +
-        '<button class="icon small" title="复制" onclick="dupServer(' + i + ')">&#10697; 复制</button>' +
-        '<button class="small danger" title="删除该服务器" onclick="removeServer(' + i + ')">&#10005; 删除</button>' +
+        '<button class="icon small" title="' + t.moveUp + '" onclick="moveServer(' + i + ',-1)">&#9650; ' + t.moveUp + '</button>' +
+        '<button class="icon small" title="' + t.moveDown + '" onclick="moveServer(' + i + ',1)">&#9660; ' + t.moveDown + '</button>' +
+        '<button class="icon small" title="' + t.duplicate + '" onclick="dupServer(' + i + ')">&#10697; ' + t.duplicate + '</button>' +
+        '<button class="small danger" title="' + t.delete + '" onclick="removeServer(' + i + ')">&#10005; ' + t.delete + '</button>' +
       '</div>' +
     '</div>' +
     '<div class="row">' +
       '<div>' +
-        '<label>name *</label>' +
-        '<input type="text" data-f="name" value="' + esc(s.name) + '" oninput="onField(' + i + ')" placeholder="如 listfiles">' +
+        '<label>' + t.nameLabel + '</label>' +
+        '<input type="text" data-f="name" value="' + esc(s.name) + '" oninput="onField(' + i + ')" placeholder="' + (currentLang === 'zh' ? '如 listfiles' : 'e.g. listfiles') + '">' +
       '</div>' +
       '<div>' +
-        '<label>endpoint *</label>' +
-        '<input type="text" data-f="endpoint" value="' + esc(s.endpoint) + '" oninput="onField(' + i + ')" placeholder="如 /mcp/listfiles">' +
+        '<label>' + t.endpointLabel + '</label>' +
+        '<input type="text" data-f="endpoint" value="' + esc(s.endpoint) + '" oninput="onField(' + i + ')" placeholder="' + (currentLang === 'zh' ? '如 /mcp/listfiles' : 'e.g. /mcp/listfiles') + '">' +
       '</div>' +
     '</div>' +
     '<div class="row">' +
       '<div>' +
-        '<label>version（server 实现版本，默认 1.0.0）</label>' +
+        '<label>' + t.versionLabel + '</label>' +
         '<input type="text" data-f="version" value="' + esc(s.version) + '" oninput="onField(' + i + ')" placeholder="1.0.0">' +
       '</div>' +
       '<div>' +
-        '<label>protocolVersion（对外固定协议版本）</label>' +
+        '<label>' + t.protocolVersionLabel + '</label>' +
         '<select data-f="protocolVersion" onchange="onField(' + i + ')">' + protoOpts + "</select>" +
       '</div>' +
     '</div>' +
-    '<label>command *</label>' +
-    '<input type="text" data-f="command" value="' + esc(s.command) + '" oninput="onField(' + i + ')" placeholder="如 npx">' +
-    '<label>args（每行一个参数）</label>' +
+    '<label>' + t.commandLabel + '</label>' +
+    '<input type="text" data-f="command" value="' + esc(s.command) + '" oninput="onField(' + i + ')" placeholder="' + (currentLang === 'zh' ? '如 npx' : 'e.g. npx') + '">' +
+    '<label>' + t.argsLabel + '</label>' +
     '<textarea data-f="args" oninput="onField(' + i + ')" placeholder="-y&#10;@modelcontextprotocol/server-filesystem">' + esc(argsText) + "</textarea>" +
-    '<label>env（每行一个 KEY=VALUE）</label>' +
+    '<label>' + t.envLabel + '</label>' +
     '<textarea data-f="env" oninput="onField(' + i + ')" placeholder="LOG_LEVEL=debug">' + esc(envLines.join("\n")) + "</textarea>" +
   "</div>";
 }
@@ -290,8 +420,9 @@ function esc(s) {
 
 function renderServers() {
   const el = document.getElementById("servers");
+  const t = i18n[currentLang];
   if (servers.length === 0) {
-    el.innerHTML = '<div class="card empty">还没有服务器，点击下方“添加服务器”。</div>';
+    el.innerHTML = '<div class="card empty">' + t.noServers + '</div>';
   } else {
     el.innerHTML = servers.map((s, i) => serverCard(i, s)).join("");
   }
@@ -350,7 +481,7 @@ function generate() {
   }
   lines.push("servers:");
   if (servers.length === 0) {
-    lines.push("  # （暂无服务器）");
+    lines.push("  # " + i18n[currentLang].noServersYaml);
   }
   servers.forEach(s => {
     lines.push("  - name: " + yamlStr(s.name || ""));
@@ -418,16 +549,17 @@ function renderCmds() {
   const base = baseURL(effAdmin);
   const example = servers.find(s => s.name) || { name: "listfiles" };
   const n = escJSON(example.name);
+  const t = i18n[currentLang];
   const cmd = [];
-  cmd.push("# 查看所有 server 状态（GET）");
+  cmd.push(t.cmdStatus);
   cmd.push("curl -s " + base + statusPath);
   cmd.push("");
-  cmd.push("# 控制操作（POST），action 可选 reload / stop / start");
-  cmd.push("# 作用于全部 server：不传 server 字段");
+  cmd.push(t.cmdControl);
+  cmd.push(t.cmdAllServers);
   cmd.push("curl -s -X POST " + base + controlPath + " \\");
   cmd.push("  -H 'Content-Type: application/json' -d '{\"action\":\"reload\"}'");
   cmd.push("");
-  cmd.push("# 作用于单个 server（server 用配置里的 name，例如 \"" + example.name + "\"）");
+  cmd.push(t.cmdSingleServer + example.name + "\")");
   cmd.push("curl -s -X POST " + base + controlPath + " \\");
   cmd.push("  -H 'Content-Type: application/json' -d '{\"action\":\"reload\",\"server\":\"" + n + "\"}'");
   document.getElementById("cmds").textContent = cmd.join("\n");
@@ -451,7 +583,8 @@ function copyOut() {
   const el = document.getElementById("out");
   el.select();
   el.setSelectionRange(0, el.value.length);
-  navigator.clipboard.writeText(el.value).then(() => flash("已复制到剪贴板"));
+  const t = i18n[currentLang];
+  navigator.clipboard.writeText(el.value).then(() => flash(t.copied));
 }
 function downloadOut() {
   const blob = new Blob([document.getElementById("out").value], { type: "application/yaml" });
